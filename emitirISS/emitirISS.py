@@ -108,15 +108,18 @@ def emitir_guias(pagina, contexto, nome_prestador, mes, ano):
 
                     nova_pagina.close()
                     pagina.bring_to_front()
+                    
+                    time.sleep(3)
 
                     try:
                         pyautogui.moveTo(880, 225, duration=0.1)
                         pyautogui.click()
+                        time.sleep(2)
+                        
                         pagina.click('input.botaoVoltar')
                         pagina.wait_for_load_state("networkidle")
+                        pagina.wait_for_selector('select[name="pessoaModel.idPessoa"]:not([disabled])', timeout=5000)
                         time.sleep(1)
-                        pagina.click("text=Pesquisar")
-                        pagina.wait_for_timeout(1500)
                     except Exception as e:
                         registro["Mensagem de Erro"] = f"Erro ao retornar: {e}"
                         break
@@ -136,8 +139,6 @@ def emitir_guias(pagina, contexto, nome_prestador, mes, ano):
                         pagina.click('input.botaoVoltar')
                         pagina.wait_for_load_state("networkidle")
                         time.sleep(1)
-                        pagina.click("text=Pesquisar")
-                        pagina.wait_for_timeout(1500)
                     except Exception as e2:
                         print(f"❌ Falha ao tentar voltar após erro: {e2}")
                         registro["Mensagem de Erro"] += f" | Falha ao voltar: {e2}"

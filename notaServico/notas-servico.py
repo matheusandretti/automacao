@@ -1,6 +1,7 @@
 import os
 import time
 from datetime import datetime
+import subprocess
 from playwright.sync_api import sync_playwright
 
 # Caminho base dos downloads
@@ -343,4 +344,9 @@ with sync_playwright() as p:
                 tem_registro_recebida
             )
 
-    input("\n🛑 Pressione ENTER para encerrar manualmente...")
+
+    # Caminho para o script principal.py
+    CAMINHO_PRINCIPAL = r"C:\Users\Usuario\Documents\PYTHON\IMPORTADOR_NFSE\principal.py"
+
+    print("\n🚀 Executando principal.py...")
+    subprocess.run(["python", CAMINHO_PRINCIPAL], check=True)
