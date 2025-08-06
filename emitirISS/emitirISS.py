@@ -6,7 +6,7 @@ from playwright.sync_api import sync_playwright
 import pyautogui
 
 # Diretório base dos downloads
-BASE_DOWNLOAD_DIR = r"\\192.0.0.251\arquivos\XML PREFEITURA\GUIAS"
+BASE_DOWNLOAD_DIR = r"\\192.0.0.251\arquivos\XML PREFEITURA"
 
 # Lista de log dos prestadores
 log_prestadores = []
@@ -64,29 +64,35 @@ def emitir_guias(pagina, contexto, nome_prestador, mes, ano):
                 pagina.wait_for_timeout(300)
 
                 pagina.once("dialog", lambda dialog: dialog.accept())
+                
+                try:
+                    with contexto.expect_page() as nova_guia_info:
+                        pagina.locator("input#emitir").click()
 
-                with contexto.expect_page() as nova_guia_info:
-                    pagina.locator("input#emitir").click()
+                    nova_pagina = nova_guia_info.value
+                    nova_pagina.wait_for_url("**/nfsguiarecolhimento.imprimir.logic", timeout=10000)
+                    nova_pagina.wait_for_load_state("load")
+                    print("📄 PDF carregado. Tentando fazer download...")
+                    time.sleep(3)
 
-                nova_pagina = nova_guia_info.value
-                nova_pagina.wait_for_url("**/nfsguiarecolhimento.imprimir.logic", timeout=10000)
-                nova_pagina.wait_for_load_state("load")
-                print("📄 PDF carregado. Tentando fazer download...")
-                time.sleep(3)
+                    with nova_pagina.expect_download(timeout=10000) as download_info:
+                        pyautogui.moveTo(1192, 124, duration=0.1)
+                        pyautogui.click()
+                        time.sleep(2)
 
-                with nova_pagina.expect_download(timeout=10000) as download_info:
-                    pyautogui.moveTo(1192, 124, duration=0.1)
-                    pyautogui.click()
-                    time.sleep(2)
+                    download_pdf = download_info.value
+                    caminho_final_pdf = montar_caminho_download(nome_prestador, mes, ano)
+                    download_pdf.save_as(caminho_final_pdf)
+                    print(f"✅ PDF salvo em:\n{caminho_final_pdf}")
+                    registro["Download Guia"] = "OK"
 
-                download_pdf = download_info.value
-                caminho_final_pdf = montar_caminho_download(nome_prestador, mes, ano)
-                download_pdf.save_as(caminho_final_pdf)
-                print(f"✅ PDF salvo em:\n{caminho_final_pdf}")
-                registro["Download Guia"] = "OK"
-
-                nova_pagina.close()
-                pagina.bring_to_front()
+                    nova_pagina.close()
+                    pagina.bring_to_front()
+                    
+                except Exception as e:
+                    msg = "Guia já emitida ou nova aba não abriu"
+                    print(f"⚠️ {msg}: {e}")
+                    registro["Mensagem de Erro"] = msg
 
                 try:
                     pyautogui.moveTo(880, 225, duration=0.1)
@@ -96,13 +102,11 @@ def emitir_guias(pagina, contexto, nome_prestador, mes, ano):
                     time.sleep(1)
                     pagina.click("text=Pesquisar")
                     pagina.wait_for_timeout(1500)
-                except Exception as e:
-                    registro["Mensagem de Erro"] = f"Erro ao retornar: {e}"
-                    break
-
-                if pagina.is_visible("text=Não há registros"):
-                    print("✅ Nenhuma nova guia encontrada. Passando para o próximo prestador.")
-                    break
+                except Exception as e2:
+                    print(f"❌ Falha ao tentar voltar: {e2}")
+                    registro["Mensagem de Erro"] += f" | Falha ao voltar: {e2}"
+                    
+                break
 
         except Exception as e:
             print(f"❗ Erro inesperado ao emitir guia: {e}")
