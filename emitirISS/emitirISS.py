@@ -42,16 +42,36 @@ def emitir_guias(pagina, contexto, nome_prestador, mes, ano):
         "Mensagem de Erro": ""
     }
 
+    links_emissao = pagina.locator('a[title="Emissão"]')
+    total_links = links_emissao.count()
+
+    if total_links == 0:
+        print("⚠️ Nenhuma guia para emitir.")
+        log_prestadores.append(registro)
+        return
+
+    # Filtra pelos do mês/ano correto
+    hrefs_filtrados = []
+    for i in range(total_links):
+        link = links_emissao.nth(i)
+        href = link.get_attribute("href")
+        if href and "viewEditGuia" in href:
+            partes = href.split("'")
+            if len(partes) >= 6:
+                mes_href = int(partes[3])
+                ano_href = int(partes[5])
+                if mes_href == mes and ano_href == ano:
+                    hrefs_filtrados.append(link)
+
+    if not hrefs_filtrados:
+        print(f"⚠️ Nenhuma guia encontrada para {mes}/{ano}")
+        registro["Mensagem de Erro"] = f"Guia(s) de {mes}/{ano} não encontrada(s)"
+        log_prestadores.append(registro)
+        return
+
     while True:
-        links_emissao = pagina.locator('a[title="Emissão"]')
-        total_links = links_emissao.count()
-
-        if total_links == 0:
-            print("⚠️ Nenhuma guia para emitir.")
-            break
-
         try:
-            link = links_emissao.nth(0)
+            link = hrefs_filtrados[0]
             href = link.get_attribute("href")
 
             if href and "viewEditGuia" in href:
@@ -64,9 +84,9 @@ def emitir_guias(pagina, contexto, nome_prestador, mes, ano):
                 pagina.wait_for_timeout(300)
 
                 pagina.once("dialog", lambda dialog: dialog.accept())
-                
+
                 try:
-                    with contexto.expect_page() as nova_guia_info:
+                    with contexto.expect_page(timeout=5000) as nova_guia_info:
                         pagina.locator("input#emitir").click()
 
                     nova_pagina = nova_guia_info.value
@@ -88,25 +108,40 @@ def emitir_guias(pagina, contexto, nome_prestador, mes, ano):
 
                     nova_pagina.close()
                     pagina.bring_to_front()
-                    
+
+                    try:
+                        pyautogui.moveTo(880, 225, duration=0.1)
+                        pyautogui.click()
+                        pagina.click('input.botaoVoltar')
+                        pagina.wait_for_load_state("networkidle")
+                        time.sleep(1)
+                        pagina.click("text=Pesquisar")
+                        pagina.wait_for_timeout(1500)
+                    except Exception as e:
+                        registro["Mensagem de Erro"] = f"Erro ao retornar: {e}"
+                        break
+
+                    if pagina.is_visible("text=Não há registros"):
+                        print("✅ Nenhuma nova guia encontrada. Passando para o próximo prestador.")
+                        break
+
                 except Exception as e:
-                    msg = "Guia já emitida ou nova aba não abriu"
+                    msg = "Guia já emitida ou erro ao abrir nova aba"
                     print(f"⚠️ {msg}: {e}")
                     registro["Mensagem de Erro"] = msg
 
-                try:
-                    pyautogui.moveTo(880, 225, duration=0.1)
-                    pyautogui.click()
-                    pagina.click('input.botaoVoltar')
-                    pagina.wait_for_load_state("networkidle")
-                    time.sleep(1)
-                    pagina.click("text=Pesquisar")
-                    pagina.wait_for_timeout(1500)
-                except Exception as e2:
-                    print(f"❌ Falha ao tentar voltar: {e2}")
-                    registro["Mensagem de Erro"] += f" | Falha ao voltar: {e2}"
-                    
-                break
+                    try:
+                        pyautogui.moveTo(880, 225, duration=0.1)
+                        pyautogui.click()
+                        pagina.click('input.botaoVoltar')
+                        pagina.wait_for_load_state("networkidle")
+                        time.sleep(1)
+                        pagina.click("text=Pesquisar")
+                        pagina.wait_for_timeout(1500)
+                    except Exception as e2:
+                        print(f"❌ Falha ao tentar voltar após erro: {e2}")
+                        registro["Mensagem de Erro"] += f" | Falha ao voltar: {e2}"
+                    break
 
         except Exception as e:
             print(f"❗ Erro inesperado ao emitir guia: {e}")
